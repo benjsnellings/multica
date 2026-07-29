@@ -941,11 +941,11 @@ func (h *Handler) ListChatMessagesPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A session can contain one server-authored onboarding kickoff. Fetch one
+	// extra row beyond the normal lookahead so hiding it cannot make a visible
+	// page appear shorter or lose its next cursor.
 	messages, err := h.Queries.ListChatMessagesPage(r.Context(), db.ListChatMessagesPageParams{
 		ChatSessionID:   session.ID,
-		// A session can contain one server-authored onboarding kickoff. Fetch
-		// one extra row beyond the normal lookahead so hiding it cannot make a
-		// visible page appear shorter or lose its next cursor.
 		Limit:           int32(limit + 2),
 		BeforeCreatedAt: beforeCreatedAt,
 		BeforeID:        beforeID,
