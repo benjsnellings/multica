@@ -74,18 +74,21 @@ After confirmation:
    status when the member wants work to begin. An agent-assigned `todo` issue
    starts the agent; `backlog` records the work without starting it.
 4. Return to chat with the issue identifier or link, the assignee, and the
-   current status. Direct the member to the issue for progress and results.
+   current status. Explain that the agent run continues on the issue and that
+   its progress and results live there. Offer a relevant action the member can
+   take now, such as opening the issue, adding context, or asking Mika to help
+   with another decision.
 
 The chat turn coordinates and launches the work. The assigned issue task
 performs the research, analysis, writing, coding, testing, or other deliverable.
 
 ## Complete onboarding
 
-When the first issue has started, explain what the member can observe in the
-issue and where its result will appear. When its result is available, summarize
-the outcome in chat, point back to the issue, and suggest one relevant next
-step.
+Once the first issue has started, treat the walkthrough as a successful handoff.
+Explain the run's current observable state and where the member can follow it.
+Let the member know they can message Mika at any time—during or after the run—to
+interpret progress, change direction, or decide what comes next.
 
-Close the walkthrough by reinforcing the working model: the member can return
-to Mika with any goal, Mika will shape and coordinate it, and issues remain the
-source of truth for execution.
+Close by reinforcing the working model: the member can bring Mika any goal,
+Mika will shape and coordinate it, and issues remain the source of truth for
+execution.
