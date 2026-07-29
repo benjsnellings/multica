@@ -91,6 +91,7 @@ import type {
   PendingChatTasksResponse,
   HasPendingChatTasksResponse,
   SendChatMessageResponse,
+  StartMikaOnboardingResponse,
   CancelTaskResponse,
   Project,
   CreateProjectRequest,
@@ -2242,6 +2243,16 @@ export class ApiClient {
     return this.fetch(`/api/chat/sessions/${sessionId}/messages`, {
       method: "POST",
       body: JSON.stringify(body),
+    });
+  }
+
+  async startMikaOnboarding(
+    sessionId: string,
+    data: { language: "en" | "zh" | "ko" | "ja" },
+  ): Promise<StartMikaOnboardingResponse> {
+    return this.fetch(`/api/chat/sessions/${sessionId}/onboarding`, {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   }
 

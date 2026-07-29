@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Download } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2 } from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import {
   Dialog,
@@ -69,6 +69,7 @@ export function StepPlatformFork({
 
   const [dialog, setDialog] = useState<DialogState>(null);
   const [downloaded, setDownloaded] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   const picker = useRuntimePicker(wsId);
 
@@ -81,10 +82,15 @@ export function StepPlatformFork({
     setDialog("cli");
   };
 
-  const handleCliConnect = () => {
-    if (!picker.selected) return;
-    setDialog(null);
-    onNext(picker.selected);
+  const handleCliConnect = async () => {
+    if (!picker.selected || connecting) return;
+    setConnecting(true);
+    try {
+      await onNext(picker.selected);
+      setDialog(null);
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const footerHint = (() => {
@@ -191,6 +197,7 @@ export function StepPlatformFork({
         selectedName={
           picker.selected ? runtimeDisplayLabel(picker.selected) : null
         }
+        connecting={connecting}
         cliInstructions={cliInstructions}
       />
     </div>
@@ -313,17 +320,19 @@ function CliInstallDialog({
   hasRuntimes,
   canConnect,
   selectedName,
+  connecting,
   cliInstructions,
 }: {
   open: boolean;
   onClose: () => void;
-  onConnect: () => void;
+  onConnect: () => void | Promise<void>;
   runtimes: AgentRuntime[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   hasRuntimes: boolean;
   canConnect: boolean;
   selectedName: string | null;
+  connecting: boolean;
   cliInstructions?: ReactNode;
 }) {
   const { t } = useT("onboarding");
@@ -383,8 +392,9 @@ function CliInstallDialog({
             <Button variant="ghost" onClick={onClose}>
               {t(($) => $.common.cancel)}
             </Button>
-            <Button disabled={!canConnect} onClick={onConnect}>
-              {t(($) => $.step_runtime.start_exploring)}
+            <Button disabled={!canConnect || connecting} onClick={onConnect}>
+              {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t(($) => $.step_runtime.continue)}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

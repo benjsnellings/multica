@@ -12,8 +12,13 @@ export interface ChatPinnedAgent {
  * server or a future kind never breaks rendering.
  * - "message"     — an ordinary user/assistant message.
  * - "no_response" — a completed direct-chat turn that produced no text reply.
+ * - "onboarding_kickoff" — a product-authored opening input that is sent to
+ *   Mika but never rendered as a member message.
  */
-export type ChatMessageKind = "message" | "no_response";
+export type ChatMessageKind =
+  | "message"
+  | "no_response"
+  | "onboarding_kickoff";
 
 /** Preview of a session's most recent message, for the IM-style list. */
 export interface ChatLastMessage {
@@ -139,6 +144,13 @@ export interface SendChatMessageResponse {
    * compat with servers that predate the field.
    */
   attachment_ids?: string[];
+}
+
+export interface StartMikaOnboardingResponse {
+  /** True only for the request that created the opening task. */
+  started: boolean;
+  task_id?: string;
+  created_at?: string;
 }
 
 export interface CancelledChatMessage {

@@ -9,6 +9,7 @@ import {
   completeOnboarding,
   ONBOARDING_STEP_ORDER,
   saveQuestionnaire,
+  useBootstrapMika,
   useWelcomeStore,
   type OnboardingStep,
   type QuestionnaireAnswers,
@@ -20,6 +21,11 @@ import { StepAboutYou } from "./steps/step-about-you";
 import { StepWorkspace } from "./steps/step-workspace";
 import { StepRuntimeConnect } from "./steps/step-runtime-connect";
 import { StepPlatformFork } from "./steps/step-platform-fork";
+import {
+  buildMikaRequest,
+  getMikaOnboarding,
+  pickContentLang,
+} from "./templates";
 import { useT } from "../i18n";
 
 const EMPTY_QUESTIONNAIRE: QuestionnaireAnswers = {
@@ -78,11 +84,9 @@ function mergeQuestionnaire(
 }
 
 /**
-/**
- * Shell's onComplete contract:
- *   onComplete(workspace?, issueId?) — if an issue id is present, navigate
- *   straight into that onboarding issue; otherwise navigate into the
- *   workspace issues list.
+ * Shell's onComplete contract carries the workspace plus an optional
+ * destination. Runtime-connected onboarding opens the real Mika conversation
+ * started by the final step; other exits land on the workspace issue list.
  *
  * Three exit shapes feed onComplete:
  *   - Skip-existing (Welcome): completeOnboarding marks onboarded; navigate
@@ -90,15 +94,13 @@ function mergeQuestionnaire(
  *   - Runtime-skipped (no runtime on Step 3): completeOnboarding marks
  *     onboarded; we push a {choice:"skip"} welcome signal and navigate
  *     to the workspace. The welcome hook in the workspace shell creates
- *     the install-runtime / create-agent guide issues on landing.
- *   - Runtime-connected (runtime picked on Step 3): completeOnboarding
- *     marks onboarded; we push a {choice:"runtime", runtimeId} welcome
- *     signal and navigate. The welcome hook creates the Multica Helper
- *     agent on the picked runtime and shows the starter-card Modal.
+ *     one install-runtime guide issue on landing.
+ *   - Runtime-connected: create or repair the workspace's Mika on the selected
+ *     runtime, start one hidden onboarding kickoff, mark onboarding complete,
+ *     and open Mika's real chat. No fixed specialist team is created.
  *
- * V3 contract: this file never touches createAgent / createIssue. The
- * "what runs in the workspace shell after onboarding" decision is in
- * `packages/views/workspace/welcome-after-onboarding.tsx`.
+ * This file never touches createAgent / createIssue. The runtime-skipped
+ * guide flow remains in `packages/views/workspace/welcome-after-onboarding.tsx`.
  */
 export function OnboardingFlow({
   onComplete,
@@ -106,7 +108,10 @@ export function OnboardingFlow({
   onRuntimeRefresh,
   runtimesPending,
 }: {
-  onComplete: (workspace?: Workspace, issueId?: string) => void;
+  onComplete: (
+    workspace?: Workspace,
+    destination?: OnboardingDestination,
+  ) => void;
   runtimeInstructions?: React.ReactNode;
   /** Desktop wires this to restart the bundled daemon so a freshly
    *  installed agent CLI gets picked up on the runtime step. Web omits
@@ -118,7 +123,7 @@ export function OnboardingFlow({
    *  or probing CLI versions (MUL-5119). Web omits it. */
   runtimesPending?: boolean;
 }) {
-  const { t } = useT("onboarding");
+  const { t, i18n } = useT("onboarding");
   const user = useAuthStore((s) => s.user);
   if (!user) {
     throw new Error("OnboardingFlow requires an authenticated user");
@@ -133,6 +138,7 @@ export function OnboardingFlow({
 
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const bootstrapMika = useBootstrapMika(workspace?.id ?? "");
 
   // Fetched at Step 0 + Step 2. Step 2 uses it to detect a pre-existing
   // workspace from an earlier abandoned onboarding (so StepWorkspace shows
@@ -198,10 +204,8 @@ export function OnboardingFlow({
 
   // "I've done this before" path — returning user who already has a
   // workspace and just wants to land there. Marks onboarding complete
-  // server-side (idempotent via COALESCE on onboarded_at); when the
-  // target workspace has no runtime yet, the server seeds the same
-  // install-runtime issue as Step 3 Skip so the user lands on a
-  // concrete next step.
+  // server-side (idempotent via COALESCE on onboarded_at) and navigates
+  // without creating new workspace content.
   const handleWelcomeSkip = useCallback(async () => {
     try {
       await completeOnboarding("skip_existing", workspaces[0]?.id);
@@ -226,19 +230,37 @@ export function OnboardingFlow({
   const handleRuntimeNext = useCallback(
     async (rt: AgentRuntime | null) => {
       if (!workspace) return;
-      // Step 3 in v3 does exactly two things:
-      //   1. Mark onboarded server-side (the workspace layout hard gate
-      //      will redirect us back to /onboarding without this).
-      //   2. Park a transient welcome signal for the workspace shell to
-      //      consume on the next render, telling it what the user chose.
-      // Helper-agent creation and starter-issue creation happen in the
-      // workspace shell's welcome hook, AFTER navigation, via the generic
-      // createAgent / createIssue endpoints.
+      // A connected runtime provisions only Mika and immediately opens the
+      // real interactive onboarding conversation. Specialists are created
+      // later, only when the member's actual workflow justifies them.
+      if (rt) {
+        const contentLang = pickContentLang(i18n.language);
+        try {
+          // The earlier questionnaire saves are deliberately optimistic. Flush
+          // the latest snapshot here so the server-authored kickoff can read
+          // reliable role/use-case context instead of racing the last PATCH.
+          await saveQuestionnaire(answers);
+          const result = await bootstrapMika.mutateAsync({
+            agent: buildMikaRequest(contentLang, rt.id),
+            onboarding: getMikaOnboarding(contentLang),
+          });
+          await completeOnboarding("full", workspace.id);
+          onComplete(workspace, {
+            kind: "chat",
+            sessionId: result.chatSession.id,
+          });
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : t(($) => $.errors.mika_setup_failed),
+          );
+          throw err;
+        }
+        return;
+      }
       try {
-        await completeOnboarding(
-          rt ? "full" : "runtime_skipped",
-          workspace.id,
-        );
+        await completeOnboarding("runtime_skipped", workspace.id);
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : t(($) => $.errors.skip_failed),
@@ -247,12 +269,11 @@ export function OnboardingFlow({
       }
       useWelcomeStore.getState().set({
         workspaceId: workspace.id,
-        choice: rt ? "runtime" : "skip",
-        ...(rt ? { runtimeId: rt.id } : {}),
+        choice: "skip",
       });
       onComplete(workspace, undefined);
     },
-    [workspace, onComplete, t],
+    [answers, bootstrapMika, i18n.language, workspace, onComplete, t],
   );
 
   const handleBack = useCallback((from: OnboardingStep) => {
@@ -266,9 +287,8 @@ export function OnboardingFlow({
     setStep(prev);
   }, []);
 
-  // Welcome, Questionnaire, and Workspace own full-bleed two-column
-  // layouts (hero / side panel) with their own DragStrip + StepHeader.
-  // The runtime step owns its own full-bleed shell.
+  // Every step owns its full-bleed shell; this component only switches
+  // between the active screen.
   if (step === "welcome") {
     return (
       <StepWelcome
@@ -331,5 +351,12 @@ export function OnboardingFlow({
 
   return null;
 }
+
+export type OnboardingDestination =
+  | { kind: "issue"; issueId: string }
+  | {
+      kind: "chat";
+      sessionId: string;
+    };
 
 export type { OnboardingStep };

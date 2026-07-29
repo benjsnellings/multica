@@ -66,12 +66,16 @@ function WindowOverlayInner() {
       {overlay.type === "invitations" && <InvitationsPage />}
       {overlay.type === "onboarding" && (
         <OnboardingFlow
-          onComplete={(ws, issueId) => {
+          onComplete={(ws, destination) => {
             close();
-            // Runtime-connected onboarding lands on its single guide
-            // issue. Runtime-less exits still land on the issues list.
-            if (ws && issueId) {
-              push(paths.workspace(ws.slug).issueDetail(issueId));
+            if (ws && destination?.kind === "chat") {
+              push(
+                paths.workspace(ws.slug).chatSession(destination.sessionId),
+              );
+            } else if (ws && destination?.kind === "issue") {
+              push(
+                paths.workspace(ws.slug).issueDetail(destination.issueId),
+              );
             } else if (ws) {
               push(paths.workspace(ws.slug).issues());
             } else {

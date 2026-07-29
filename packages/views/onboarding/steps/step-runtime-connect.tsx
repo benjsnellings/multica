@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  MonitorUp,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@multica/ui/components/ui/button";
 import { cn } from "@multica/ui/lib/utils";
 import { useScrollFade } from "@multica/ui/hooks/use-scroll-fade";
@@ -190,8 +196,7 @@ function FancyView({
       setSubmitting(false);
     }
   };
-  // Continue only makes sense when a runtime is selected. Otherwise
-  // there's nothing to pass to Step 4.
+  // Starting with Mika only makes sense when a runtime is selected.
   const canContinue = phase === "found" && selected !== null;
   const handleContinue = async () => {
     if (!canContinue || submitting) return;
@@ -284,7 +289,7 @@ function FancyView({
                   - Skip: shown while scanning / found. The empty phase owns its
                     own prominent Skip card, so the footer Skip is dropped there
                     to avoid two "Skip for now" buttons on one screen.
-                  - Start exploring: only actionable once a runtime is picked, so
+                  - Continue: only actionable once a runtime is picked, so
                     it renders only in the found phase instead of sitting
                     permanently disabled through scanning / empty. */}
             <div className="mt-8 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
@@ -313,7 +318,7 @@ function FancyView({
                       {submitting && (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       )}
-                      {t(($) => $.step_runtime.start_exploring)}
+                      {t(($) => $.step_runtime.continue)}
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   )}
@@ -356,6 +361,7 @@ function ScanningView() {
         <span className="font-medium text-foreground">{"Cursor"}</span>
         {t(($) => $.step_runtime.scanning_lede_suffix)}
       </p>
+      <RemoteComputerNote />
       <div className="mt-10 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <SkeletonRuntimeCard />
         <SkeletonRuntimeCard />
@@ -398,6 +404,7 @@ function FoundView({
       <p className="mt-4 max-w-[560px] text-[15.5px] leading-[1.55] text-muted-foreground">
         {t(($) => $.step_runtime.found_lede)}
       </p>
+      <RemoteComputerNote />
 
       <div className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/60 px-4 py-2.5 text-xs">
         <span className="font-semibold text-foreground">
@@ -467,6 +474,7 @@ function EmptyView({
         <span className="font-medium text-foreground">{"Cursor"}</span>
         {t(($) => $.step_runtime.empty_lede_suffix)}
       </p>
+      <RemoteComputerNote />
 
       <div className="mt-10 flex flex-col gap-3.5">
         <EmptyCard
@@ -482,6 +490,22 @@ function EmptyView({
           badgeLabel={t(($) => $.step_runtime.empty_waitlist_action)}
         />
       </div>
+    </div>
+  );
+}
+
+function RemoteComputerNote() {
+  const { t } = useT("onboarding");
+
+  return (
+    <div className="mt-5 flex max-w-[560px] items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+      <MonitorUp
+        aria-hidden
+        className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+      />
+      <p className="text-[13px] leading-[1.55] text-muted-foreground">
+        {t(($) => $.step_runtime.remote_computer_later_note)}
+      </p>
     </div>
   );
 }
