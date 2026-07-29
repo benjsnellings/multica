@@ -37,7 +37,7 @@ import { useT } from "../../i18n";
  * (multi-select) on ONE screen. They were separate steps once, but
  * they share the same eyebrow and neither deserves a full screen of
  * its own — merging them cut the onboarding progress bar from five
- * steps to four. The answers remain useful for product personalization
+ * steps to three. The answers remain useful for product personalization
  * and onboarding analytics, independent of agent creation.
  *
  * Answering is optional per group:
