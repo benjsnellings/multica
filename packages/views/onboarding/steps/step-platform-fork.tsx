@@ -53,11 +53,16 @@ const DOWNLOAD_PAGE_URL = "/download";
 
 export function StepPlatformFork({
   wsId,
+  wsSlug,
   onNext,
   onBack,
   cliInstructions,
 }: {
   wsId: string;
+  /** Slug of the target workspace. Sent explicitly so the runtime list reads
+   *  the workspace being set up rather than whichever one the app is currently
+   *  showing. */
+  wsSlug?: string;
   onNext: (runtime: AgentRuntime | null) => void | Promise<void>;
   onBack?: () => void;
   /** Platform-specific CLI install card, rendered inside the CLI dialog. */
@@ -71,7 +76,7 @@ export function StepPlatformFork({
   const [downloaded, setDownloaded] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  const picker = useRuntimePicker(wsId);
+  const picker = useRuntimePicker(wsId, wsSlug);
 
   const pickDesktop = () => {
     window.open(DOWNLOAD_PAGE_URL, "_blank", "noopener,noreferrer");

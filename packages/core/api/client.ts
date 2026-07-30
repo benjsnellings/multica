@@ -388,6 +388,23 @@ export class PreviewUnsupportedError extends Error {
  */
 export const CHAT_DRAFT_RESTORE_CAPABILITY = "chat-draft-restore-v1";
 
+/**
+ * Per-call override for the workspace a request targets.
+ *
+ * `authHeaders()` normally stamps `X-Workspace-Slug` from the global
+ * current-workspace singleton, and the server resolves the workspace from that
+ * header BEFORE any `workspace_id` query param. Anything that acts on a
+ * workspace the user is not currently "in" — notably the create-workspace flow,
+ * which provisions a workspace it has not navigated to yet — must say so
+ * explicitly, or a concurrent writer of that singleton silently redirects the
+ * write to the wrong workspace.
+ */
+function workspaceHeader(
+  slug?: string,
+): Record<string, string> | undefined {
+  return slug ? { "X-Workspace-Slug": slug } : undefined;
+}
+
 export class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -1076,12 +1093,16 @@ export class ApiClient {
    * client cannot mint an agent that would claim them. The server is also the
    * idempotency boundary — calling twice yields the same agent.
    */
-  async createMikaAgent(data: {
-    runtime_id: string;
-    language: "en" | "zh" | "ko" | "ja";
-  }): Promise<Agent> {
+  async createMikaAgent(
+    data: {
+      runtime_id: string;
+      language: "en" | "zh" | "ko" | "ja";
+    },
+    workspaceSlug?: string,
+  ): Promise<Agent> {
     return this.fetch("/api/agents/mika", {
       method: "POST",
+      headers: workspaceHeader(workspaceSlug),
       body: JSON.stringify(data),
     });
   }
@@ -1218,11 +1239,19 @@ export class ApiClient {
     return this.fetch(`/api/agents/${id}/cancel-tasks`, { method: "POST" });
   }
 
-  async listRuntimes(params?: { workspace_id?: string; owner?: "me" }): Promise<AgentRuntime[]> {
+  async listRuntimes(
+    params?: { workspace_id?: string; owner?: "me" },
+    workspaceSlug?: string,
+  ): Promise<AgentRuntime[]> {
     const search = new URLSearchParams();
     if (params?.workspace_id) search.set("workspace_id", params.workspace_id);
     if (params?.owner) search.set("owner", params.owner);
-    return this.fetch(`/api/runtimes?${search}`);
+    // workspace_id alone is not enough: the server resolves the workspace from
+    // the slug header first, so a caller listing another workspace's runtimes
+    // must override the header too.
+    return this.fetch(`/api/runtimes?${search}`, {
+      headers: workspaceHeader(workspaceSlug),
+    });
   }
 
   async listCloudRuntimeNodes(
@@ -1902,9 +1931,7 @@ export class ApiClient {
   ): Promise<NotificationPreferenceResponse> {
     const raw = await this.fetch<unknown>("/api/notification-preferences", {
       method: "PATCH",
-      headers: workspaceSlug
-        ? { "X-Workspace-Slug": workspaceSlug }
-        : undefined,
+      headers: workspaceHeader(workspaceSlug),
       body: JSON.stringify({ preferences }),
     });
     return parseWithFallback(
@@ -2151,22 +2178,31 @@ export class ApiClient {
   }
 
   // Chat Sessions
-  async listChatSessions(params?: { status?: string }): Promise<ChatSession[]> {
+  async listChatSessions(
+    params?: { status?: string },
+    workspaceSlug?: string,
+  ): Promise<ChatSession[]> {
     const query = params?.status ? `?status=${params.status}` : "";
-    return this.fetch(`/api/chat/sessions${query}`);
+    return this.fetch(`/api/chat/sessions${query}`, {
+      headers: workspaceHeader(workspaceSlug),
+    });
   }
 
   async getChatSession(id: string): Promise<ChatSession> {
     return this.fetch(`/api/chat/sessions/${id}`);
   }
 
-  async createChatSession(data: {
-    agent_id: string;
-    title?: string;
-    project_id?: string | null;
-  }): Promise<ChatSession> {
+  async createChatSession(
+    data: {
+      agent_id: string;
+      title?: string;
+      project_id?: string | null;
+    },
+    workspaceSlug?: string,
+  ): Promise<ChatSession> {
     return this.fetch("/api/chat/sessions", {
       method: "POST",
+      headers: workspaceHeader(workspaceSlug),
       body: JSON.stringify(data),
     });
   }
@@ -2272,9 +2308,11 @@ export class ApiClient {
       /** True when this member has onboarded in another workspace already. */
       returning?: boolean;
     },
+    workspaceSlug?: string,
   ): Promise<StartMikaOnboardingResponse> {
     return this.fetch(`/api/chat/sessions/${sessionId}/onboarding`, {
       method: "POST",
+      headers: workspaceHeader(workspaceSlug),
       body: JSON.stringify(data),
     });
   }

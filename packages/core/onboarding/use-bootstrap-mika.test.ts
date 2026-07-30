@@ -39,6 +39,7 @@ const session = {
 } as ChatSession;
 
 const input = {
+  workspaceSlug: "venus",
   runtimeId: "runtime-1",
   title: "Getting started with Mika",
   language: "en",
@@ -64,18 +65,19 @@ describe("bootstrapMika", () => {
     // Only a runtime and a language cross the wire: name, description, avatar,
     // permissions and the system prompt are the server's to decide.
     expect(mocks.createMikaAgent).toHaveBeenCalledOnce();
-    expect(mocks.createMikaAgent).toHaveBeenCalledWith({
-      runtime_id: "runtime-1",
-      language: "en",
-    });
-    expect(mocks.createChatSession).toHaveBeenCalledWith({
-      agent_id: "agent-1",
-      title: "Getting started with Mika",
-    });
-    expect(mocks.startMikaOnboarding).toHaveBeenCalledWith("session-1", {
-      language: "en",
-      returning: false,
-    });
+    expect(mocks.createMikaAgent).toHaveBeenCalledWith(
+      { runtime_id: "runtime-1", language: "en" },
+      "venus",
+    );
+    expect(mocks.createChatSession).toHaveBeenCalledWith(
+      { agent_id: "agent-1", title: "Getting started with Mika" },
+      "venus",
+    );
+    expect(mocks.startMikaOnboarding).toHaveBeenCalledWith(
+      "session-1",
+      { language: "en", returning: false },
+      "venus",
+    );
     expect(result.agent).toBe(agent);
     expect(result.chatSession).toBe(session);
   });
@@ -100,10 +102,11 @@ describe("bootstrapMika", () => {
 
     // Creating a second workspace should not re-teach the product; the flag
     // is what lets Mika compress the introduction to one line.
-    expect(mocks.startMikaOnboarding).toHaveBeenCalledWith("session-1", {
-      language: "en",
-      returning: true,
-    });
+    expect(mocks.startMikaOnboarding).toHaveBeenCalledWith(
+      "session-1",
+      { language: "en", returning: true },
+      "venus",
+    );
   });
 
   it("reuses the existing session and lets the server no-op the kickoff", async () => {
@@ -114,5 +117,26 @@ describe("bootstrapMika", () => {
 
     expect(mocks.createChatSession).not.toHaveBeenCalled();
     expect(mocks.startMikaOnboarding).toHaveBeenCalledOnce();
+  });
+
+  // MUL-5501: on desktop the tab system also writes the global
+  // current-workspace singleton, and it reclaims it while this flow runs —
+  // the new workspace has no tab group yet. Every request here therefore has
+  // to name its own workspace; when they did not, Mika was provisioned into
+  // whichever workspace the shell had switched back to.
+  it("names the target workspace on every request, not just the first", async () => {
+    mocks.listChatSessions.mockResolvedValue([]);
+    mocks.createChatSession.mockResolvedValue(session);
+
+    await bootstrapMika({ ...input, workspaceSlug: "proxima-centauri" });
+
+    for (const call of [
+      mocks.createMikaAgent,
+      mocks.listChatSessions,
+      mocks.createChatSession,
+      mocks.startMikaOnboarding,
+    ]) {
+      expect(call.mock.calls[0]).toContain("proxima-centauri");
+    }
   });
 });

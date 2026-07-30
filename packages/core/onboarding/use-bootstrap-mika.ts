@@ -7,6 +7,14 @@ import { workspaceKeys } from "../workspace/queries";
 export type MikaOnboardingLanguage = "en" | "zh" | "ko" | "ja";
 
 export interface BootstrapMikaInput {
+  /**
+   * Slug of the workspace being provisioned. Every call below sends it
+   * explicitly instead of relying on the global current-workspace singleton:
+   * this flow acts on a workspace the app has not navigated to yet, and on
+   * desktop the tab system writes that singleton too — it reclaimed it
+   * mid-flow and Mika was created in the previously-active workspace.
+   */
+  workspaceSlug: string;
   runtimeId: string;
   /** Localized title for the opening conversation. */
   title: string;
@@ -37,12 +45,18 @@ export async function bootstrapMika(
     kickoff: Awaited<ReturnType<typeof api.startMikaOnboarding>>;
   }
 > {
-  const agent = await api.createMikaAgent({
-    runtime_id: input.runtimeId,
-    language: input.language,
-  });
+  const agent = await api.createMikaAgent(
+    {
+      runtime_id: input.runtimeId,
+      language: input.language,
+    },
+    input.workspaceSlug,
+  );
 
-  const sessions = await api.listChatSessions({ status: "all" });
+  const sessions = await api.listChatSessions(
+    { status: "all" },
+    input.workspaceSlug,
+  );
   const existingSession = sessions.find(
     (session) =>
       session.status === "active" &&
@@ -51,15 +65,22 @@ export async function bootstrapMika(
   );
   const chatSession =
     existingSession ??
-    (await api.createChatSession({
-      agent_id: agent.id,
-      title: input.title,
-    }));
+    (await api.createChatSession(
+      {
+        agent_id: agent.id,
+        title: input.title,
+      },
+      input.workspaceSlug,
+    ));
 
-  const kickoff = await api.startMikaOnboarding(chatSession.id, {
-    language: input.language,
-    returning: input.returning ?? false,
-  });
+  const kickoff = await api.startMikaOnboarding(
+    chatSession.id,
+    {
+      language: input.language,
+      returning: input.returning ?? false,
+    },
+    input.workspaceSlug,
+  );
 
   return { agent, chatSession, kickoff };
 }

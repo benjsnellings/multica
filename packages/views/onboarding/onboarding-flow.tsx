@@ -3,7 +3,6 @@
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { setCurrentWorkspace } from "@multica/core/platform";
 import { useAuthStore } from "@multica/core/auth";
 import {
   completeOnboarding,
@@ -236,7 +235,12 @@ export function OnboardingFlow({
   const handleWorkspaceCreated = useCallback(
     (ws: Workspace) => {
       setWorkspace(ws);
-      setCurrentWorkspace(ws.slug, ws.id);
+      // Deliberately NOT setCurrentWorkspace: that singleton is also written by
+      // the desktop tab system, which reclaims it whenever the new workspace
+      // has no tab group yet. Racing it sent the rest of this flow — Mika, the
+      // session, the kickoff — into the previously-active workspace. Every call
+      // from here on names its target workspace instead, and the switch happens
+      // once, on the navigation in onComplete.
       advanceFrom("workspace");
     },
     [advanceFrom],
@@ -256,6 +260,7 @@ export function OnboardingFlow({
           // reliable role/use-case context instead of racing the last PATCH.
           await saveQuestionnaire(answers);
           const result = await bootstrapMika.mutateAsync({
+            workspaceSlug: workspace.slug,
             runtimeId: rt.id,
             returning: isNewWorkspace,
             ...getMikaOnboarding(contentLang),
@@ -368,6 +373,7 @@ export function OnboardingFlow({
       return (
         <StepRuntimeConnect
           wsId={workspace.id}
+          wsSlug={workspace.slug}
           onNext={handleRuntimeNext}
           onBack={runtimeStepBack}
           onRefresh={onRuntimeRefresh}
@@ -378,6 +384,7 @@ export function OnboardingFlow({
     return (
       <StepPlatformFork
         wsId={workspace.id}
+        wsSlug={workspace.slug}
         onNext={handleRuntimeNext}
         onBack={runtimeStepBack}
         cliInstructions={runtimeInstructions}

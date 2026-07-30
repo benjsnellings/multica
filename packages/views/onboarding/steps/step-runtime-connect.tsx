@@ -43,12 +43,17 @@ import { useT } from "../../i18n";
  */
 export function StepRuntimeConnect({
   wsId,
+  wsSlug,
   onNext,
   onBack,
   onRefresh,
   runtimesPending,
 }: {
   wsId: string;
+  /** Slug of the target workspace. Sent explicitly so the runtime list reads
+   *  the workspace being set up rather than whichever one the app is currently
+   *  showing. */
+  wsSlug?: string;
   onNext: (runtime: AgentRuntime | null) => void | Promise<void>;
   onBack?: () => void;
   /** Platform-level rescan hook. Desktop wires this to restart the
@@ -64,7 +69,7 @@ export function StepRuntimeConnect({
   runtimesPending?: boolean;
 }) {
   const { runtimes, selected, selectedId, setSelectedId } =
-    useRuntimePicker(wsId);
+    useRuntimePicker(wsId, wsSlug);
 
   return (
     <FancyView

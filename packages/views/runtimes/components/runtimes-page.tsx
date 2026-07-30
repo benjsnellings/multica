@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@multica/core/auth";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { useBootstrapMika } from "@multica/core/onboarding";
-import { useWorkspacePaths } from "@multica/core/paths";
+import { useRequiredWorkspaceSlug, useWorkspacePaths } from "@multica/core/paths";
 import { agentTaskSnapshotOptions } from "@multica/core/agents";
 import { runtimeProfileListOptions } from "@multica/core/runtimes";
 import { runtimeListOptions, runtimeKeys } from "@multica/core/runtimes/queries";
@@ -206,12 +206,14 @@ function MikaSetupCard({
   const { t, i18n } = useT("runtimes");
   const navigation = useNavigation();
   const paths = useWorkspacePaths();
+  const wsSlug = useRequiredWorkspaceSlug();
   const bootstrapMika = useBootstrapMika(workspaceId);
 
   const handleStart = async () => {
     const lang = pickContentLang(i18n.language);
     try {
       const result = await bootstrapMika.mutateAsync({
+        workspaceSlug: wsSlug,
         runtimeId: runtime.id,
         ...getMikaOnboarding(lang),
       });
