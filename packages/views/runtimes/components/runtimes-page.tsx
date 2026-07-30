@@ -32,7 +32,6 @@ import {
 import { PageHeader } from "../../layout/page-header";
 import { AppLink, useNavigation } from "../../navigation";
 import {
-  buildMikaRequest,
   getMikaOnboarding,
   pickContentLang,
 } from "../../onboarding/templates";
@@ -213,8 +212,8 @@ function MikaSetupCard({
     const lang = pickContentLang(i18n.language);
     try {
       const result = await bootstrapMika.mutateAsync({
-        agent: buildMikaRequest(lang, runtime.id),
-        onboarding: getMikaOnboarding(lang),
+        runtimeId: runtime.id,
+        ...getMikaOnboarding(lang),
       });
       navigation.push(paths.chatSession(result.chatSession.id));
     } catch (error) {

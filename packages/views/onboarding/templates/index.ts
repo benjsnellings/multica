@@ -8,7 +8,6 @@ export {
   INSTALL_RUNTIME_ISSUE_BODY,
 } from "./install-runtime-issue";
 export {
-  buildMikaRequest,
   getMikaOnboarding,
   type MikaContentLang,
   type MikaOnboardingDefinition,

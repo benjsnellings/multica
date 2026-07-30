@@ -22,7 +22,6 @@ import { StepWorkspace } from "./steps/step-workspace";
 import { StepRuntimeConnect } from "./steps/step-runtime-connect";
 import { StepPlatformFork } from "./steps/step-platform-fork";
 import {
-  buildMikaRequest,
   getMikaOnboarding,
   pickContentLang,
 } from "./templates";
@@ -241,8 +240,8 @@ export function OnboardingFlow({
           // reliable role/use-case context instead of racing the last PATCH.
           await saveQuestionnaire(answers);
           const result = await bootstrapMika.mutateAsync({
-            agent: buildMikaRequest(contentLang, rt.id),
-            onboarding: getMikaOnboarding(contentLang),
+            runtimeId: rt.id,
+            ...getMikaOnboarding(contentLang),
           });
           await completeOnboarding("full", workspace.id);
           onComplete(workspace, {

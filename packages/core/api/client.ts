@@ -1067,6 +1067,25 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Provisions the workspace's built-in Chief of Staff, or returns the
+   * existing one.
+   *
+   * Only a runtime and a language are sent: name, description, avatar,
+   * permissions, and the system instruction layer are server constants, so a
+   * client cannot mint an agent that would claim them. The server is also the
+   * idempotency boundary — calling twice yields the same agent.
+   */
+  async createMikaAgent(data: {
+    runtime_id: string;
+    language: "en" | "zh" | "ko" | "ja";
+  }): Promise<Agent> {
+    return this.fetch("/api/agents/mika", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   async createAgentBuilderSession(data: {
     runtime_id: string;
     model?: string;
