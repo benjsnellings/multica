@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
@@ -20,6 +21,19 @@ func startMikaOnboarding(t *testing.T, sessionID string, body any) *httptest.Res
 	w := httptest.NewRecorder()
 	testHandler.StartMikaOnboarding(w, req)
 	return w
+}
+
+// markAsMika stamps the system_key that identifies the workspace's built-in
+// agent. The onboarding endpoint gates on this rather than the display name,
+// so a fixture merely named "Mika" is not enough.
+func markAsMika(t *testing.T, agentID string) string {
+	t.Helper()
+	if _, err := testPool.Exec(context.Background(),
+		`UPDATE agent SET system_key = $2 WHERE id = $1`, agentID, service.MikaSystemKey,
+	); err != nil {
+		t.Fatalf("mark agent as mika: %v", err)
+	}
+	return agentID
 }
 
 func decodeStartMikaOnboarding(t *testing.T, w *httptest.ResponseRecorder) startMikaOnboardingResponse {
@@ -55,7 +69,7 @@ func cleanupSessionTasks(t *testing.T, sessionID string) {
 // reason to exist: one product-authored opening turn that the runtime receives
 // as a normal chat input batch but the member never sees as a bubble.
 func TestStartMikaOnboarding_EnqueuesOneHiddenKickoff(t *testing.T) {
-	agentID := createHandlerTestAgent(t, "Mika", nil)
+	agentID := markAsMika(t, createHandlerTestAgent(t, "Mika", nil))
 	sessionID := createHandlerTestChatSession(t, agentID)
 	cleanupSessionTasks(t, sessionID)
 
@@ -107,7 +121,7 @@ func TestStartMikaOnboarding_EnqueuesOneHiddenKickoff(t *testing.T) {
 // TestStartMikaOnboarding_IsIdempotent is the retry / double-submit guarantee
 // the handler documents: a second call must not enqueue a second opening turn.
 func TestStartMikaOnboarding_IsIdempotent(t *testing.T) {
-	agentID := createHandlerTestAgent(t, "Mika", nil)
+	agentID := markAsMika(t, createHandlerTestAgent(t, "Mika", nil))
 	sessionID := createHandlerTestChatSession(t, agentID)
 	cleanupSessionTasks(t, sessionID)
 
@@ -142,7 +156,7 @@ func TestStartMikaOnboarding_IsIdempotent(t *testing.T) {
 }
 
 func TestStartMikaOnboarding_RejectsBadInput(t *testing.T) {
-	mikaID := createHandlerTestAgent(t, "Mika", nil)
+	mikaID := markAsMika(t, createHandlerTestAgent(t, "Mika", nil))
 	mikaSession := createHandlerTestChatSession(t, mikaID)
 	cleanupSessionTasks(t, mikaSession)
 
@@ -157,7 +171,7 @@ func TestStartMikaOnboarding_RejectsBadInput(t *testing.T) {
 	}{
 		{"unsupported language", mikaSession, map[string]any{"language": "fr"}},
 		{"missing language", mikaSession, map[string]any{}},
-		{"non-Mika agent", otherSession, map[string]any{"language": "en"}},
+		{"agent without the mika system_key", otherSession, map[string]any{"language": "en"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

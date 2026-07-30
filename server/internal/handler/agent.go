@@ -35,17 +35,28 @@ import (
 const maxAgentDescriptionLength = 255
 
 type AgentResponse struct {
-	ID            string          `json:"id"`
-	WorkspaceID   string          `json:"workspace_id"`
-	RuntimeID     string          `json:"runtime_id"`
-	Name          string          `json:"name"`
-	Description   string          `json:"description"`
-	Instructions  string          `json:"instructions"`
-	AvatarURL     *string         `json:"avatar_url"`
-	RuntimeMode   string          `json:"runtime_mode"`
-	RuntimeConfig any             `json:"runtime_config"`
-	CustomArgs    []string        `json:"custom_args"`
-	McpConfig     json.RawMessage `json:"mcp_config"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+	RuntimeID   string `json:"runtime_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Instructions is what this agent's owner wrote. For a system agent it
+	// holds only the workspace's own notes — the product half lives in
+	// SystemInstructions and is never stored on the row.
+	Instructions string `json:"instructions"`
+	// SystemKey identifies a product-defined agent (e.g. "mika"). Empty for
+	// every user- or template-created agent. The UI keys "this is maintained
+	// by Multica" off this rather than off the display name, which owners may
+	// change.
+	SystemKey string `json:"system_key,omitempty"`
+	// SystemInstructions is the read-only product half of a system agent's
+	// prompt, filled from the server binary. Empty for ordinary agents.
+	SystemInstructions string          `json:"system_instructions,omitempty"`
+	AvatarURL          *string         `json:"avatar_url"`
+	RuntimeMode        string          `json:"runtime_mode"`
+	RuntimeConfig      any             `json:"runtime_config"`
+	CustomArgs         []string        `json:"custom_args"`
+	McpConfig          json.RawMessage `json:"mcp_config"`
 	// custom_env is intentionally NOT serialized on agent resources. The
 	// agent_list/get/create/update/archive/restore responses and WS events
 	// only expose coarse metadata (has_custom_env, custom_env_key_count) so
@@ -162,6 +173,8 @@ func agentToResponse(a db.Agent) AgentResponse {
 		Name:                     a.Name,
 		Description:              a.Description,
 		Instructions:             a.Instructions,
+		SystemKey:                a.SystemKey.String,
+		SystemInstructions:       systemInstructionsFor(a),
 		AvatarURL:                textToPtr(a.AvatarUrl),
 		RuntimeMode:              a.RuntimeMode,
 		RuntimeConfig:            rc,

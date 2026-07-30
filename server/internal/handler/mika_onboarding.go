@@ -74,8 +74,10 @@ func (h *Handler) StartMikaOnboarding(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to load chat agent")
 		return
 	}
-	if agent.Name != "Mika" {
-		writeError(w, http.StatusBadRequest, "onboarding can only be started with Mika")
+	// Identity is the system_key, never the display name: owners may rename
+	// Mika, and gating on the name turned a rename into a 400.
+	if agent.SystemKey.String != service.MikaSystemKey {
+		writeError(w, http.StatusBadRequest, "onboarding can only be started with the workspace's built-in agent")
 		return
 	}
 	if uuidToString(agent.OwnerID) != userID {

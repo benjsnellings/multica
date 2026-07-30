@@ -1506,3 +1506,29 @@ SET status = CASE WHEN EXISTS (
     updated_at = now()
 WHERE a.id = $1
 RETURNING *;
+
+-- name: GetAgentBySystemKey :one
+-- Resolves a workspace's built-in agent by its stable system_key. This is the
+-- identity lookup for system agents: their display name is owner-editable, so
+-- nothing server-side may key off it.
+SELECT * FROM agent
+WHERE workspace_id = $1 AND system_key = $2 AND archived_at IS NULL
+LIMIT 1;
+
+-- name: CreateSystemUserAgent :one
+-- Creates a product-defined agent that members can still see, chat with, and
+-- assign issues to. Deliberately kind='user': kind='system' hides the row from
+-- agent lists and assignment surfaces and hard deletes it with its runtime.
+-- Every product-owned field is a server constant; instructions stays empty
+-- because the system half ships with the binary and is layered in at claim
+-- time, leaving this column free for the workspace's own notes.
+INSERT INTO agent (
+    workspace_id, name, description, avatar_url, runtime_mode, runtime_config,
+    runtime_id, visibility, permission_mode, max_concurrent_tasks, owner_id,
+    instructions, custom_env, custom_args, kind, system_key
+) VALUES (
+    @workspace_id, @name, @description, @avatar_url, @runtime_mode, '{}'::jsonb,
+    @runtime_id, @visibility, @permission_mode, @max_concurrent_tasks, @owner_id,
+    '', '{}'::jsonb, '[]'::jsonb, 'user', @system_key
+)
+RETURNING *;
