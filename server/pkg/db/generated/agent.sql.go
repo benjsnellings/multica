@@ -131,6 +131,7 @@ const archiveAgentsByRuntime = `-- name: ArchiveAgentsByRuntime :many
 UPDATE agent
 SET archived_at = now(), archived_by = $1, updated_at = now()
 WHERE runtime_id = ANY($2::uuid[]) AND archived_at IS NULL
+  AND (system_key IS NULL OR system_key = '')
 RETURNING id, workspace_id, name, avatar_url, runtime_mode, runtime_config, visibility, status, max_concurrent_tasks, owner_id, created_at, updated_at, description, runtime_id, instructions, archived_at, archived_by, custom_env, custom_args, mcp_config, model, thinking_level, composio_toolkit_allowlist, permission_mode, kind, system_key, disabled_runtime_skills, service_tier
 `
 
@@ -143,6 +144,13 @@ type ArchiveAgentsByRuntimeParams struct {
 // Used when revoking a leaving member's runtimes so agents pinned to those
 // runtimes can no longer be assigned new work. Returns the affected rows so
 // the caller can broadcast agent:archived per agent.
+//
+// System agents are exempt: they belong to the workspace rather than to the
+// member who happened to create them, and the workspace's entry point runs
+// through one. Archiving Mika because a colleague left would take the default
+// agent away from everyone. Its runtime does go offline with the departure, so
+// it needs rebinding — but it stays visible and recoverable instead of
+// vanishing.
 func (q *Queries) ArchiveAgentsByRuntime(ctx context.Context, arg ArchiveAgentsByRuntimeParams) ([]Agent, error) {
 	rows, err := q.db.Query(ctx, archiveAgentsByRuntime, arg.ArchivedBy, arg.RuntimeIds)
 	if err != nil {
@@ -2594,6 +2602,7 @@ func (q *Queries) GetAgent(ctx context.Context, id pgtype.UUID) (Agent, error) {
 const getAgentBySystemKey = `-- name: GetAgentBySystemKey :one
 SELECT id, workspace_id, name, avatar_url, runtime_mode, runtime_config, visibility, status, max_concurrent_tasks, owner_id, created_at, updated_at, description, runtime_id, instructions, archived_at, archived_by, custom_env, custom_args, mcp_config, model, thinking_level, composio_toolkit_allowlist, permission_mode, kind, system_key, disabled_runtime_skills, service_tier FROM agent
 WHERE workspace_id = $1 AND system_key = $2 AND archived_at IS NULL
+ORDER BY created_at ASC, id ASC
 LIMIT 1
 `
 

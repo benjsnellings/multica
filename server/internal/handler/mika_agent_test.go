@@ -57,8 +57,8 @@ func TestCreateMikaAgent_ServerOwnsTheDefinition(t *testing.T) {
 	if resp.SystemKey != service.MikaSystemKey {
 		t.Fatalf("system_key = %q, want %q", resp.SystemKey, service.MikaSystemKey)
 	}
-	if resp.Name != mikaAgentName {
-		t.Fatalf("name = %q, want %q", resp.Name, mikaAgentName)
+	if resp.Name != service.MikaDefaultName {
+		t.Fatalf("name = %q, want %q", resp.Name, service.MikaDefaultName)
 	}
 	if resp.PermissionMode != mikaAgentPermissionMode {
 		t.Fatalf("permission_mode = %q, want %q", resp.PermissionMode, mikaAgentPermissionMode)
@@ -121,26 +121,90 @@ func TestCreateMikaAgent_RejectsUnsupportedLanguage(t *testing.T) {
 
 // TestComposeMikaInstructions covers the layering contract: the product half
 // always leads, workspace notes are labelled with their provenance, and an
-// empty second layer adds nothing.
+// empty second layer adds nothing — including the section heading that
+// describes it.
 func TestComposeMikaInstructions(t *testing.T) {
-	system := service.MikaSystemInstructions()
+	system := service.MikaSystemInstructions(service.MikaDefaultName)
 
-	if got := service.ComposeMikaInstructions(""); got != system {
+	if got := service.ComposeMikaInstructions(service.MikaDefaultName, ""); got != system {
 		t.Fatal("an empty workspace layer must compose to exactly the system layer")
 	}
-	if got := service.ComposeMikaInstructions("   \n  "); got != system {
+	if got := service.ComposeMikaInstructions(service.MikaDefaultName, "   \n  "); got != system {
 		t.Fatal("a blank workspace layer must compose to exactly the system layer")
 	}
+	// Without notes the prompt must not end by announcing a section that has
+	// nothing under it.
+	if strings.Contains(system, "Workspace notes below add") {
+		t.Fatalf("the notes rule must not appear when there are no notes:\n%s", system)
+	}
 
-	composed := service.ComposeMikaInstructions("Our main repo is acme/platform.")
+	composed := service.ComposeMikaInstructions(service.MikaDefaultName, "Our main repo is acme/platform.")
 	if !strings.HasPrefix(composed, system) {
 		t.Fatal("the system layer must lead the composed prompt")
 	}
-	if !strings.Contains(composed, "Added by this workspace's admins") {
-		t.Fatal("workspace notes must be labelled with their provenance")
+	for _, want := range []string{
+		"## Workspace notes",
+		"Workspace notes below add",
+		"Added by this workspace's admins",
+		"Our main repo is acme/platform.",
+	} {
+		if !strings.Contains(composed, want) {
+			t.Fatalf("composed prompt missing %q:\n%s", want, composed)
+		}
 	}
-	if !strings.Contains(composed, "Our main repo is acme/platform.") {
-		t.Fatal("composed prompt must carry the workspace notes")
+}
+
+// The runtime brief announces "**You are: <name>**" from the agent row, so a
+// hardcoded "You are Mika" would contradict it the moment an owner renames the
+// agent.
+func TestMikaSystemInstructionsUsesTheCurrentDisplayName(t *testing.T) {
+	renamed := service.MikaSystemInstructions("Jarvis")
+	if !strings.HasPrefix(renamed, "You are Jarvis,") {
+		t.Fatalf("prompt should open as the current name:\n%s", renamed[:120])
+	}
+	if strings.Contains(renamed, "{{AGENT_NAME}}") {
+		t.Fatal("the name placeholder must be substituted")
+	}
+	// The product identity is still stated, just not as the display name.
+	if !strings.Contains(renamed, "built-in system agent (Mika)") {
+		t.Fatal("prompt should still identify itself as Multica's built-in agent")
+	}
+
+	if blank := service.MikaSystemInstructions("   "); !strings.HasPrefix(blank, "You are Mika,") {
+		t.Fatalf("a blank name should fall back to the default:\n%s", blank[:120])
+	}
+}
+
+// TestArchiveMikaIsRejected: archiving would hide the workspace's entry point
+// while leaving the row in place, which also strands the bootstrap endpoint —
+// its lookup skips archived rows but the unique index does not.
+func TestArchiveMikaIsRejected(t *testing.T) {
+	cleanupMika(t)
+	w := createMika(t, map[string]any{
+		"runtime_id": handlerTestRuntimeID(t),
+		"language":   "en",
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	agentID := decodeAgent(t, w).ID
+
+	req := withChatTestWorkspaceCtx(t, withURLParam(
+		newRequest("POST", "/api/agents/"+agentID+"/archive", nil), "id", agentID,
+	))
+	archiveW := httptest.NewRecorder()
+	testHandler.ArchiveAgent(archiveW, req)
+	if archiveW.Code != http.StatusBadRequest {
+		t.Fatalf("archiving a system agent: expected 400, got %d: %s", archiveW.Code, archiveW.Body.String())
+	}
+
+	var archivedAt *string
+	if err := testPool.QueryRow(context.Background(),
+		`SELECT archived_at::text FROM agent WHERE id = $1`, agentID).Scan(&archivedAt); err != nil {
+		t.Fatalf("load agent: %v", err)
+	}
+	if archivedAt != nil {
+		t.Fatalf("agent must remain active, got archived_at = %v", *archivedAt)
 	}
 }
 

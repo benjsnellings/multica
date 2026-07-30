@@ -176,9 +176,17 @@ RETURNING *;
 -- Used when revoking a leaving member's runtimes so agents pinned to those
 -- runtimes can no longer be assigned new work. Returns the affected rows so
 -- the caller can broadcast agent:archived per agent.
+--
+-- System agents are exempt: they belong to the workspace rather than to the
+-- member who happened to create them, and the workspace's entry point runs
+-- through one. Archiving Mika because a colleague left would take the default
+-- agent away from everyone. Its runtime does go offline with the departure, so
+-- it needs rebinding — but it stays visible and recoverable instead of
+-- vanishing.
 UPDATE agent
 SET archived_at = now(), archived_by = @archived_by, updated_at = now()
 WHERE runtime_id = ANY(@runtime_ids::uuid[]) AND archived_at IS NULL
+  AND (system_key IS NULL OR system_key = '')
 RETURNING *;
 
 -- name: ArchiveAgentsByIDs :many
@@ -1513,6 +1521,7 @@ RETURNING *;
 -- nothing server-side may key off it.
 SELECT * FROM agent
 WHERE workspace_id = $1 AND system_key = $2 AND archived_at IS NULL
+ORDER BY created_at ASC, id ASC
 LIMIT 1;
 
 -- name: CreateSystemUserAgent :one

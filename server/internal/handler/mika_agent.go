@@ -20,7 +20,6 @@ import (
 // the onboarding gate. Letting it would both forge a "Mika" and break the
 // one-per-workspace invariant.
 const (
-	mikaAgentName           = "Mika"
 	mikaAgentMaxConcurrency = 3
 	mikaAgentVisibility     = "workspace"
 	mikaAgentPermissionMode = "public_to"
@@ -108,9 +107,35 @@ func (h *Handler) CreateMikaAgent(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	qtx := h.Queries.WithTx(tx)
 
+	// Serialize provisioning per workspace. The check above is only a fast
+	// path: without this, two members clicking "Start with Mika" at the same
+	// moment both miss and both insert. Migration 172's unique index would not
+	// stop them either — it covers (workspace_id, owner_id, runtime_id,
+	// system_key), so different owners or different runtimes are distinct
+	// tuples, and the workspace would end up with two live Mikas.
+	if _, err := tx.Exec(r.Context(),
+		"SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+		"mika:"+workspaceID,
+	); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to lock the workspace agent")
+		return
+	}
+	// Re-check under the lock: a request that was mid-flight when we started
+	// may have committed by now.
+	if existing, err := qtx.GetAgentBySystemKey(r.Context(), db.GetAgentBySystemKeyParams{
+		WorkspaceID: wsUUID,
+		SystemKey:   pgtype.Text{String: service.MikaSystemKey, Valid: true},
+	}); err == nil {
+		h.writeMikaAgentResponse(w, r, existing, workspaceID, false)
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		writeError(w, http.StatusInternalServerError, "failed to look up the workspace agent")
+		return
+	}
+
 	created, err := qtx.CreateSystemUserAgent(r.Context(), db.CreateSystemUserAgentParams{
 		WorkspaceID:        wsUUID,
-		Name:               mikaAgentName,
+		Name:               service.MikaDefaultName,
 		Description:        description,
 		AvatarUrl:          pgtype.Text{String: mikaAgentAvatarURL, Valid: true},
 		RuntimeMode:        runtime.RuntimeMode,
@@ -165,7 +190,7 @@ func (h *Handler) writeMikaAgentResponse(w http.ResponseWriter, r *http.Request,
 // prompt is already in the editable Instructions field.
 func systemInstructionsFor(a db.Agent) string {
 	if a.SystemKey.String == service.MikaSystemKey {
-		return service.MikaSystemInstructions()
+		return service.MikaSystemInstructions(a.Name)
 	}
 	return ""
 }
