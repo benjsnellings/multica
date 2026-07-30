@@ -11,6 +11,9 @@ export interface BootstrapMikaInput {
   /** Localized title for the opening conversation. */
   title: string;
   language: MikaOnboardingLanguage;
+  /** Set when the member has onboarded in another workspace before, so Mika
+   *  opens with one line instead of re-explaining the product. */
+  returning?: boolean;
 }
 
 export interface BootstrapMikaResult {
@@ -55,6 +58,7 @@ export async function bootstrapMika(
 
   const kickoff = await api.startMikaOnboarding(chatSession.id, {
     language: input.language,
+    returning: input.returning ?? false,
   });
 
   return { agent, chatSession, kickoff };

@@ -74,6 +74,7 @@ describe("bootstrapMika", () => {
     });
     expect(mocks.startMikaOnboarding).toHaveBeenCalledWith("session-1", {
       language: "en",
+      returning: false,
     });
     expect(result.agent).toBe(agent);
     expect(result.chatSession).toBe(session);
@@ -89,6 +90,20 @@ describe("bootstrapMika", () => {
     // Mika through them would produce an agent the claim path ignores.
     expect(mocks.createAgent).not.toHaveBeenCalled();
     expect(mocks.updateAgent).not.toHaveBeenCalled();
+  });
+
+  it("tells the server when the member has onboarded before", async () => {
+    mocks.listChatSessions.mockResolvedValue([]);
+    mocks.createChatSession.mockResolvedValue(session);
+
+    await bootstrapMika({ ...input, returning: true });
+
+    // Creating a second workspace should not re-teach the product; the flag
+    // is what lets Mika compress the introduction to one line.
+    expect(mocks.startMikaOnboarding).toHaveBeenCalledWith("session-1", {
+      language: "en",
+      returning: true,
+    });
   });
 
   it("reuses the existing session and lets the server no-op the kickoff", async () => {

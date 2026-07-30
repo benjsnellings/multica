@@ -103,6 +103,8 @@ function mergeQuestionnaire(
  */
 export function OnboardingFlow({
   onComplete,
+  mode = "first_run",
+  onCancel,
   runtimeInstructions,
   onRuntimeRefresh,
   runtimesPending,
@@ -111,6 +113,15 @@ export function OnboardingFlow({
     workspace?: Workspace,
     destination?: OnboardingDestination,
   ) => void;
+  /** "new_workspace" is the same flow run by someone who already uses
+   *  Multica: it starts at the workspace step, because the intro and the
+   *  questionnaire only make sense once per person, and it always creates a
+   *  workspace rather than offering to continue with an existing one. */
+  mode?: OnboardingMode;
+  /** Required in "new_workspace" mode: first-run onboarding has no way out
+   *  except signing out, but someone creating a second workspace must be able
+   *  to change their mind and return to where they were. */
+  onCancel?: () => void;
   runtimeInstructions?: React.ReactNode;
   /** Desktop wires this to restart the bundled daemon so a freshly
    *  installed agent CLI gets picked up on the runtime step. Web omits
@@ -135,7 +146,10 @@ export function OnboardingFlow({
   const storedQuestionnaire = mergeQuestionnaire(user.onboarding_questionnaire);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>(storedQuestionnaire);
 
-  const [step, setStep] = useState<OnboardingStep>("welcome");
+  const isNewWorkspace = mode === "new_workspace";
+  const [step, setStep] = useState<OnboardingStep>(
+    isNewWorkspace ? "workspace" : "welcome",
+  );
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const bootstrapMika = useBootstrapMika(workspace?.id ?? "");
 
@@ -150,7 +164,9 @@ export function OnboardingFlow({
     ...workspaceListOptions(),
     enabled: step === "welcome" || step === "workspace",
   });
-  const existingWorkspace = workspace ?? workspaces[0] ?? null;
+  const existingWorkspace = isNewWorkspace
+    ? workspace
+    : (workspace ?? workspaces[0] ?? null);
   const canSkipWelcome = workspacesFetched && workspaces.length > 0;
 
   // The `runtimeInstructions` slot is only plumbed by the web shell
@@ -241,6 +257,7 @@ export function OnboardingFlow({
           await saveQuestionnaire(answers);
           const result = await bootstrapMika.mutateAsync({
             runtimeId: rt.id,
+            returning: isNewWorkspace,
             ...getMikaOnboarding(contentLang),
           });
           await completeOnboarding("full", workspace.id);
@@ -276,6 +293,13 @@ export function OnboardingFlow({
   );
 
   const handleBack = useCallback((from: OnboardingStep) => {
+    // The workspace step is the entry point in new-workspace mode, so its
+    // back affordance leaves the flow instead of walking into a step this
+    // mode deliberately skips.
+    if (isNewWorkspace && from === "workspace") {
+      onCancel?.();
+      return;
+    }
     const idx = ONBOARDING_STEP_ORDER.indexOf(from);
     if (idx <= 0) {
       // About you (the first persisted step) returns to Welcome.
@@ -284,7 +308,7 @@ export function OnboardingFlow({
     }
     const prev = ONBOARDING_STEP_ORDER[idx - 1]!;
     setStep(prev);
-  }, []);
+  }, [isNewWorkspace, onCancel]);
 
   // Every step owns its full-bleed shell; this component only switches
   // between the active screen.
@@ -350,6 +374,8 @@ export function OnboardingFlow({
 
   return null;
 }
+
+export type OnboardingMode = "first_run" | "new_workspace";
 
 export type OnboardingDestination =
   | { kind: "issue"; issueId: string }

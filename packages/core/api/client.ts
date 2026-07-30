@@ -2267,7 +2267,11 @@ export class ApiClient {
 
   async startMikaOnboarding(
     sessionId: string,
-    data: { language: "en" | "zh" | "ko" | "ja" },
+    data: {
+      language: "en" | "zh" | "ko" | "ja";
+      /** True when this member has onboarded in another workspace already. */
+      returning?: boolean;
+    },
   ): Promise<StartMikaOnboardingResponse> {
     return this.fetch(`/api/chat/sessions/${sessionId}/onboarding`, {
       method: "POST",

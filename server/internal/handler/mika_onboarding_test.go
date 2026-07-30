@@ -16,6 +16,7 @@ func TestBuildMikaOnboardingKickoffSelectsSkillWithKnownContext(t *testing.T) {
 			Role:    "engineer",
 			UseCase: stringOrSlice{"ship_code", "plan_research"},
 		},
+		false,
 	)
 
 	for _, want := range []string{
@@ -44,7 +45,7 @@ func TestBuildMikaOnboardingKickoffSelectsSkillWithKnownContext(t *testing.T) {
 // below, Mika's first visible reply reads as an answer to a question nobody
 // asked (MUL-4230).
 func TestBuildMikaOnboardingKickoffFramesMikaAsOpeningTheConversation(t *testing.T) {
-	prompt := buildMikaOnboardingKickoff("English", "Venus", questionnaireAnswers{})
+	prompt := buildMikaOnboardingKickoff("English", "Venus", questionnaireAnswers{}, false)
 
 	for _, want := range []string{
 		"not a message from the member",
@@ -63,7 +64,7 @@ func TestBuildMikaOnboardingKickoffProfileVariants(t *testing.T) {
 		prompt := buildMikaOnboardingKickoff("English", "Venus", questionnaireAnswers{
 			RoleSkipped:    true,
 			UseCaseSkipped: true,
-		})
+		}, false)
 		if !strings.Contains(prompt, "skipped the profile questions") {
 			t.Fatalf("kickoff must tell Mika the profile is empty:\n%s", prompt)
 		}
@@ -78,7 +79,7 @@ func TestBuildMikaOnboardingKickoffProfileVariants(t *testing.T) {
 			RoleOther:    "support lead",
 			UseCase:      stringOrSlice{"other"},
 			UseCaseOther: "coordinate a study group",
-		})
+		}, false)
 		for _, want := range []string{
 			"Role: support lead",
 			"coordinate a study group",
@@ -112,5 +113,19 @@ func TestVisibleChatMessagesHidesOnboardingKickoff(t *testing.T) {
 	visible := visibleChatMessages(messages)
 	if len(visible) != 1 || visible[0].Content != "Hi, I'm Mika." {
 		t.Fatalf("visibleChatMessages() = %#v, want only Mika's visible reply", visible)
+	}
+}
+
+// A member creating their second workspace should not be re-taught the
+// product; one line of context is enough for the model to compress the intro.
+func TestBuildMikaOnboardingKickoffMarksAReturningMember(t *testing.T) {
+	fresh := buildMikaOnboardingKickoff("English", "Venus", questionnaireAnswers{}, false)
+	if strings.Contains(fresh, "completed onboarding in another workspace") {
+		t.Fatalf("first-run kickoff must not claim prior onboarding:\n%s", fresh)
+	}
+
+	returning := buildMikaOnboardingKickoff("English", "Venus", questionnaireAnswers{}, true)
+	if !strings.Contains(returning, "completed onboarding in another workspace") {
+		t.Fatalf("returning kickoff missing the prior-onboarding line:\n%s", returning)
 	}
 }
