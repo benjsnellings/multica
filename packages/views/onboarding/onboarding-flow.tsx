@@ -295,7 +295,9 @@ export function OnboardingFlow({
   const handleBack = useCallback((from: OnboardingStep) => {
     // The workspace step is the entry point in new-workspace mode, so its
     // back affordance leaves the flow instead of walking into a step this
-    // mode deliberately skips.
+    // mode deliberately skips. Only reachable before the workspace exists —
+    // see `runtimeStepBack` for why there is no way back into this step
+    // afterwards.
     if (isNewWorkspace && from === "workspace") {
       onCancel?.();
       return;
@@ -309,6 +311,17 @@ export function OnboardingFlow({
     const prev = ONBOARDING_STEP_ORDER[idx - 1]!;
     setStep(prev);
   }, [isNewWorkspace, onCancel]);
+
+  // Once a workspace exists there is nothing left to cancel, so new-workspace
+  // mode drops the back affordance on the runtime step. Walking back would
+  // reach the workspace step, whose own back button means "leave" — and
+  // leaving there would strand a workspace with no runtime, no Mika, and no
+  // guidance. The remaining exits both end somewhere coherent: Skip runs the
+  // runtime-skipped path (guide issue + land in the new workspace), and
+  // continuing provisions Mika.
+  const runtimeStepBack = isNewWorkspace
+    ? undefined
+    : () => handleBack("runtime");
 
   // Every step owns its full-bleed shell; this component only switches
   // between the active screen.
@@ -356,7 +369,7 @@ export function OnboardingFlow({
         <StepRuntimeConnect
           wsId={workspace.id}
           onNext={handleRuntimeNext}
-          onBack={() => handleBack("runtime")}
+          onBack={runtimeStepBack}
           onRefresh={onRuntimeRefresh}
           runtimesPending={runtimesPending}
         />
@@ -366,7 +379,7 @@ export function OnboardingFlow({
       <StepPlatformFork
         wsId={workspace.id}
         onNext={handleRuntimeNext}
-        onBack={() => handleBack("runtime")}
+        onBack={runtimeStepBack}
         cliInstructions={runtimeInstructions}
       />
     );

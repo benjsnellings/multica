@@ -1531,6 +1531,12 @@ LIMIT 1;
 -- Every product-owned field is a server constant; instructions stays empty
 -- because the system half ships with the binary and is layered in at claim
 -- time, leaving this column free for the workspace's own notes.
+--
+-- CONTRACT: call only while holding the per-workspace mika advisory lock. The
+-- one-per-workspace invariant rests on a check inside that lock, not on a
+-- unique index — migration 172's index keys on (workspace_id, owner_id,
+-- runtime_id, system_key), so two different owners or runtimes are distinct
+-- tuples and would both insert.
 INSERT INTO agent (
     workspace_id, name, description, avatar_url, runtime_mode, runtime_config,
     runtime_id, visibility, permission_mode, max_concurrent_tasks, owner_id,

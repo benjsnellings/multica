@@ -48,6 +48,14 @@ function WindowOverlayInner() {
   // complete the flow.
   const onBack = wsList.length > 0 ? close : undefined;
 
+  // The daemon's PATH probe runs once at boot, so a newly-installed CLI
+  // (Claude / Codex / Cursor) does not show up until the daemon is bounced.
+  // Both onboarding entries need this — creating a second workspace hits the
+  // same runtime step.
+  const restartDaemon = async () => {
+    await window.daemonAPI?.restart?.();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-background">
       {/* Creating a workspace is the onboarding flow entered at the
@@ -57,6 +65,8 @@ function WindowOverlayInner() {
         <OnboardingFlow
           mode="new_workspace"
           onCancel={onBack}
+          onRuntimeRefresh={restartDaemon}
+          runtimesPending={runtimesPending}
           onComplete={(ws, destination) => {
             close();
             if (ws && destination?.kind === "chat") {
@@ -95,12 +105,7 @@ function WindowOverlayInner() {
             }
           }}
           // Restart the bundled daemon when the user hits Refresh on
-          // Step 3. The daemon's PATH probe runs once at boot, so a
-          // newly-installed CLI (Claude / Codex / Cursor) doesn't show
-          // up until the daemon is bounced.
-          onRuntimeRefresh={async () => {
-            await window.daemonAPI?.restart?.();
-          }}
+          onRuntimeRefresh={restartDaemon}
           runtimesPending={runtimesPending}
         />
       )}
