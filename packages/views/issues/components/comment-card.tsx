@@ -30,9 +30,7 @@ import { copyText } from "@multica/ui/lib/clipboard";
 import { useActorName } from "@multica/core/workspace/hooks";
 import { useTimeAgo } from "../../i18n";
 import { ContentEditor, type ContentEditorRef, ReadonlyContent, useFileDropZone, FileDropOverlay, Attachment as AttachmentRenderer, AttachmentDownloadProvider, useUploadGate, useComposerSubmit } from "../../editor";
-import { PASTE_AS_FILE_THRESHOLD } from "../../editor/paste-as-file";
 import { useCommentUploads } from "./use-comment-uploads";
-import { ComposerUploadChips } from "./composer-upload-chips";
 import { FileUploadButton } from "@multica/ui/components/common/file-upload-button";
 import { api, dispatchReasonCode } from "@multica/core/api";
 import { ReplyInput } from "./reply-input";
@@ -572,13 +570,13 @@ function CommentRow({
         className="flex items-center gap-2.5 px-4 pt-1 pb-1.5"
       >
         <ActorAvatar actorType={entry.actor_type} actorId={entry.actor_id} size="md" enableHoverCard showStatusDot />
-        <span className="cursor-pointer text-sm font-medium">
+        <span className="cursor-pointer text-body font-medium">
           {getActorName(entry.actor_type, entry.actor_id)}
         </span>
         <Tooltip>
           <TooltipTrigger
             render={
-              <span className="text-xs text-muted-foreground cursor-default">
+              <span className="text-caption text-muted-foreground cursor-default">
                 {timeAgo(entry.created_at)}
               </span>
             }
@@ -589,7 +587,7 @@ function CommentRow({
         </Tooltip>
 
         {isResolution && (
-          <span className="text-xs font-medium text-success">
+          <span className="text-caption font-medium text-success">
             {t(($) => $.comment.resolve.resolution_badge)}
           </span>
         )}
@@ -662,7 +660,7 @@ function CommentRow({
           className="relative pl-12 pr-4 pt-1"
           onKeyDown={(e) => { if (e.key === "Escape") edit.cancelEdit(); }}
         >
-          <div className="text-sm leading-relaxed">
+          <div className="text-body leading-relaxed">
             <ContentEditor
               ref={edit.editorRef}
               defaultValue={edit.initialValue}
@@ -674,7 +672,6 @@ function CommentRow({
               }}
               onSubmit={edit.saveEdit}
               onUploadFile={edit.handleUpload}
-              pasteAsFileThreshold={PASTE_AS_FILE_THRESHOLD}
               onUploadingChange={edit.onUploadingChange}
               debounceMs={100}
               currentIssueId={issueId}
@@ -693,9 +690,6 @@ function CommentRow({
                 })
               }
             />
-          )}
-          {edit.uploads.some((u) => u.status !== "uploaded") && (
-            <ComposerUploadChips uploads={edit.uploads} onRemove={edit.removeUpload} className="mt-2 max-w-full" />
           )}
           <div className="flex items-center justify-between gap-2 mt-2">
             <div className="min-w-0 flex-1">
@@ -731,7 +725,7 @@ function CommentRow({
         </div>
       ) : (
         <>
-          <div className="pl-12 pr-4 pt-1 text-sm leading-relaxed text-foreground/85">
+          <div className="pl-12 pr-4 pt-1 text-body leading-relaxed text-foreground">
             <ReadonlyContent content={entry.content ?? ""} attachments={entry.attachments} />
           </div>
           <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-12 pr-4" />
@@ -758,6 +752,13 @@ function CommentRow({
 // ---------------------------------------------------------------------------
 // CommentCard — One Card per thread (parent + all replies flat inside)
 // ---------------------------------------------------------------------------
+
+// A quick action posts an ordinary comment and is rendered as one (MUL-5465).
+// It briefly had a collapsed one-line header that expanded to reveal the
+// prompt, on the theory that repeated runs would bury the discussion. In
+// practice the prompts are short, the header restated what the body already
+// said, and the disclosure only added a click between the reader and the text.
+// Provenance still lives on `quick_action_id`; it is data, not decoration.
 
 function CommentCardImpl({
   issueId,
@@ -838,7 +839,7 @@ function CommentCardImpl({
         <button
           type="button"
           onClick={onCollapseResolved}
-          className="sticky top-0 z-20 flex w-full items-center gap-2.5 border-b border-border/50 bg-muted px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground"
+          className="sticky top-0 z-20 flex w-full items-center gap-2.5 border-b border-border/50 bg-muted px-4 py-2.5 text-left text-body text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground"
           aria-label={t(($) => $.comment.resolve.collapse)}
         >
           <ListChevronsDownUp className="h-3.5 w-3.5" />
@@ -869,13 +870,13 @@ function CommentCardImpl({
                 <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-90")} />
               </button>
               <ActorAvatar actorType={entry.actor_type} actorId={entry.actor_id} size="md" enableHoverCard showStatusDot />
-              <span className="shrink-0 cursor-pointer text-sm font-medium">
+              <span className="shrink-0 cursor-pointer text-body font-medium">
                 {getActorName(entry.actor_type, entry.actor_id)}
               </span>
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <span className="shrink-0 text-xs text-muted-foreground cursor-default">
+                    <span className="shrink-0 text-caption text-muted-foreground cursor-default">
                       {timeAgo(entry.created_at)}
                     </span>
                   }
@@ -886,12 +887,12 @@ function CommentCardImpl({
               </Tooltip>
 
               {!open && contentPreview && (
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate text-caption text-muted-foreground">
                   {contentPreview}
                 </span>
               )}
               {!open && replyCount > 0 && (
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="shrink-0 text-caption text-muted-foreground">
                   {t(($) => $.comment.reply_count, { count: replyCount })}
                 </span>
               )}
@@ -975,7 +976,7 @@ function CommentCardImpl({
                 className="relative pl-10"
                 onKeyDown={(e) => { if (e.key === "Escape") edit.cancelEdit(); }}
               >
-                <div className="text-sm leading-relaxed">
+                <div className="text-body leading-relaxed">
                   <ContentEditor
                     ref={edit.editorRef}
                     defaultValue={edit.initialValue}
@@ -987,7 +988,6 @@ function CommentCardImpl({
                     }}
                     onSubmit={edit.saveEdit}
                     onUploadFile={edit.handleUpload}
-                    pasteAsFileThreshold={PASTE_AS_FILE_THRESHOLD}
                     onUploadingChange={edit.onUploadingChange}
                     debounceMs={100}
                     currentIssueId={issueId}
@@ -1009,9 +1009,6 @@ function CommentCardImpl({
                         }
                         />
                       )}
-                    {edit.uploads.some((u) => u.status !== "uploaded") && (
-                      <ComposerUploadChips uploads={edit.uploads} onRemove={edit.removeUpload} className="max-w-full" />
-                    )}
                     <CommentTriggerChips
                       agents={edit.triggerPreview.agents}
                       blocked={edit.triggerPreview.blocked}
@@ -1044,7 +1041,7 @@ function CommentCardImpl({
               </div>
             ) : (
               <>
-                <div className="pl-10 text-sm leading-relaxed text-foreground/85">
+                <div className="pl-10 text-body leading-relaxed text-foreground">
                   <ReadonlyContent content={entry.content ?? ""} attachments={entry.attachments} />
                 </div>
                 <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-10" />
@@ -1114,7 +1111,7 @@ function CommentCardImpl({
                 <button
                   type="button"
                   onClick={() => onResolvedExpandChange(entry.id, false)}
-                  className="sticky top-0 z-20 flex w-full items-center gap-2.5 border-t border-border/50 bg-muted px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                  className="sticky top-0 z-20 flex w-full items-center gap-2.5 border-t border-border/50 bg-muted px-4 py-2.5 text-left text-body text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground"
                   aria-label={t(($) => $.comment.resolve.collapse)}
                 >
                   <ListChevronsDownUp className="h-3.5 w-3.5" />

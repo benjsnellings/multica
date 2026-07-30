@@ -172,7 +172,7 @@ func (h *Handler) CreateMikaAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) writeMikaAgentResponse(w http.ResponseWriter, r *http.Request, agent db.Agent, workspaceID string, created bool) {
-	resp := agentToResponse(agent)
+	resp := h.agentToResponse(agent)
 	if err := h.enrichAgentResponseWithTargets(r.Context(), &resp, agent.ID); err != nil {
 		slog.Warn("mika agent: load invocation targets failed", append(logger.RequestAttrs(r), "error", err, "agent_id", uuidToString(agent.ID))...)
 	}

@@ -236,7 +236,7 @@ function FancyView({
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1.5 text-body text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               {t(($) => $.common.back)}
@@ -300,7 +300,7 @@ function FancyView({
             <div className="mt-8 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
               <span
                 aria-live="polite"
-                className="mr-auto text-xs text-muted-foreground"
+                className="mr-auto text-caption text-muted-foreground"
               >
                 {footerHint}
               </span>
@@ -354,10 +354,10 @@ function ScanningView() {
   const { t } = useT("onboarding");
   return (
     <div>
-      <h1 className="text-balance font-serif text-[36px] font-medium leading-[1.1] tracking-tight text-foreground">
+      <h1 className="text-balance font-serif text-display font-medium leading-[1.1] tracking-tight text-foreground">
         {t(($) => $.step_runtime.scanning_headline)}
       </h1>
-      <p className="mt-4 max-w-[560px] text-[15.5px] leading-[1.55] text-muted-foreground">
+      <p className="mt-4 max-w-[560px] text-body-lg leading-[1.55] text-muted-foreground">
         {t(($) => $.step_runtime.scanning_lede_prefix)}
         <span className="font-medium text-foreground">{"Claude Code"}</span>
         {", "}
@@ -403,15 +403,15 @@ function FoundView({
 
   return (
     <div>
-      <h1 className="text-balance font-serif text-[36px] font-medium leading-[1.1] tracking-tight text-foreground">
+      <h1 className="text-balance font-serif text-display font-medium leading-[1.1] tracking-tight text-foreground">
         {t(($) => $.step_runtime.found_headline)}
       </h1>
-      <p className="mt-4 max-w-[560px] text-[15.5px] leading-[1.55] text-muted-foreground">
+      <p className="mt-4 max-w-[560px] text-body-lg leading-[1.55] text-muted-foreground">
         {t(($) => $.step_runtime.found_lede)}
       </p>
       <RemoteComputerNote />
 
-      <div className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/60 px-4 py-2.5 text-xs">
+      <div className="mt-8 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/60 px-4 py-2.5 text-caption">
         <span className="font-semibold text-foreground">
           {t(($) => $.step_runtime.runtime_count, { count: total })}
         </span>
@@ -461,7 +461,7 @@ function EmptyView({
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-balance font-serif text-[36px] font-medium leading-[1.1] tracking-tight text-foreground">
+        <h1 className="text-balance font-serif text-display font-medium leading-[1.1] tracking-tight text-foreground">
           {t(($) => $.step_runtime.empty_headline)}
         </h1>
         <RefreshButton
@@ -470,7 +470,7 @@ function EmptyView({
           className="mt-2 shrink-0"
         />
       </div>
-      <p className="mt-4 max-w-[560px] text-[15.5px] leading-[1.55] text-muted-foreground">
+      <p className="mt-4 max-w-[560px] text-body-lg leading-[1.55] text-muted-foreground">
         {t(($) => $.step_runtime.empty_lede_prefix)}
         <span className="font-medium text-foreground">{"Claude Code"}</span>
         {", "}
@@ -536,14 +536,14 @@ function ComingSoonCard({
       className="flex items-center justify-between gap-4 rounded-lg border border-dashed bg-muted/20 px-5 py-4 opacity-70"
     >
       <div className="min-w-0">
-        <div className="text-[14.5px] font-medium text-foreground">{title}</div>
-        <p className="mt-1 text-[12.5px] leading-[1.55] text-muted-foreground">
+        <div className="text-body font-medium text-foreground">{title}</div>
+        <p className="mt-1 text-caption leading-[1.55] text-muted-foreground">
           {subtitle}
         </p>
       </div>
       <span
         aria-hidden
-        className="inline-flex shrink-0 items-center rounded-full border bg-background px-3 py-1.5 text-[12px] font-medium uppercase tracking-wide text-muted-foreground"
+        className="inline-flex shrink-0 items-center rounded-full border bg-background px-3 py-1.5 text-caption font-medium uppercase tracking-wide text-muted-foreground"
       >
         {badgeLabel}
       </span>
@@ -604,14 +604,14 @@ function EmptyCard({
       className="group flex items-center justify-between gap-4 rounded-lg border bg-card px-5 py-4 text-left transition-colors hover:border-foreground/30 hover:bg-muted/30"
     >
       <div className="min-w-0">
-        <div className="text-[14.5px] font-medium text-foreground">{title}</div>
-        <p className="mt-1 text-[12.5px] leading-[1.55] text-muted-foreground">
+        <div className="text-body font-medium text-foreground">{title}</div>
+        <p className="mt-1 text-caption leading-[1.55] text-muted-foreground">
           {subtitle}
         </p>
       </div>
       <span
         aria-hidden
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-background px-4 py-2 text-[13px] font-medium text-foreground transition-colors group-hover:border-foreground group-hover:bg-foreground group-hover:text-background"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-background px-4 py-2 text-label font-medium text-foreground transition-colors group-hover:border-foreground group-hover:bg-foreground group-hover:text-background"
       >
         {actionLabel}
         <ArrowRight className="h-3.5 w-3.5" />
@@ -653,10 +653,10 @@ function RuntimeCard({
         <ProviderLogo provider={runtime.provider} className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">
+        <div className="truncate text-body font-medium text-foreground">
           {runtimeDisplayName(runtime)}
         </div>
-        <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+        <div className="mt-0.5 flex items-center gap-1.5 font-mono text-micro text-muted-foreground">
           <span
             className={cn(
               "h-1.5 w-1.5 rounded-full",

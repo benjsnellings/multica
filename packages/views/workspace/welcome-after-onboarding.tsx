@@ -177,12 +177,12 @@ function SkipWelcome({ workspaceId, onDismiss }: SkipWelcomeProps) {
           <div className="text-6xl animate-welcome-emoji-pop" aria-hidden>
             🎉
           </div>
-          <DialogTitle className="text-center text-2xl font-semibold">
+          <DialogTitle className="text-center text-display-sm font-semibold">
             {t(($) => $.welcome_after_onboarding.skip.title)}
           </DialogTitle>
           <DialogDescription
             id="welcome-after-onboarding-skip-subtitle"
-            className="text-center text-sm text-muted-foreground max-w-md"
+            className="text-center text-body text-muted-foreground max-w-md"
           >
             {t(($) => $.welcome_after_onboarding.skip.subtitle)}
           </DialogDescription>
@@ -220,16 +220,16 @@ function SkipPreviewCard({
     <div className="flex items-start gap-3 rounded-lg border bg-background px-3 py-2.5">
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium leading-tight">
+          <p className="text-body font-medium leading-tight">
             {t(($) => $.welcome_after_onboarding.skip.cards[cardKey].title)}
           </p>
           <span
-            className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+            className="rounded-full bg-primary/10 px-2 py-0.5 text-micro font-medium text-primary"
           >
             {statusLabel}
           </span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground leading-snug">
+        <p className="mt-1 text-caption text-muted-foreground leading-snug">
           {t(($) => $.welcome_after_onboarding.skip.cards[cardKey].subtitle)}
         </p>
       </div>
@@ -242,7 +242,7 @@ function FullScreenLoading({ label }: { label: string }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-body text-muted-foreground">{label}</p>
       </div>
     </div>
   );

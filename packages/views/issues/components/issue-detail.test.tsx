@@ -194,6 +194,11 @@ vi.mock("../../editor", async () => ({
       blur: () => {},
       // Read by the submit-time upload gate; no uploads are exercised here.
       hasActiveUploads: () => false,
+      // Placeholder rebuild contract: the real handle draws a card for an
+      // upload the document is not showing and reports whether it landed.
+      // Mocks track ids only — no document to draw into.
+      insertUploadPlaceholder: () => true,
+      settleUploadPlaceholder: () => false,
       uploadFile: () => {},
     }));
     return (
@@ -1430,6 +1435,37 @@ describe("IssueDetail (shared)", () => {
         ).toContain("bg-[color-mix(in_srgb,var(--card)_95%,var(--brand)_5%)]");
       });
     });
+  });
+
+  it("marks a reply-resolved thread as resolved on the quick-jump rail", async () => {
+    // A resolution on a REPLY leaves the thread expanded, so it flattens to a
+    // plain `comment` item, not a `resolved-bar`. The rail must still read it
+    // as resolved — proof the flag comes from deriveThreadResolution and not
+    // from the fold state.
+    mockApiObj.listTimeline.mockResolvedValue([
+      ...mockTimeline,
+      {
+        type: "comment",
+        id: "reply-1",
+        actor_type: "member",
+        actor_id: "user-1",
+        content: "That fixed it",
+        parent_id: "comment-1",
+        created_at: "2026-01-18T00:00:00Z",
+        updated_at: "2026-01-18T00:00:00Z",
+        comment_type: "comment",
+        resolved_at: "2026-01-19T00:00:00Z",
+      } as TimelineEntry,
+    ]);
+
+    renderIssueDetail();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Started working on this (resolved)" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "I can help with this" })).toBeInTheDocument();
   });
 
   it("sends empty description when editor is cleared", async () => {
