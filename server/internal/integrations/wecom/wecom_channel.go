@@ -68,6 +68,10 @@ type wecomChannel struct {
 	installationID pgtype.UUID
 	botID          string
 	secret         string
+	// botDisplayName is what this bot is called in a chat, from the
+	// installation config. Empty on every installation that has not filled it
+	// in; see stripLeadingMentions for what an empty name falls back to.
+	botDisplayName string
 	handler        channel.InboundHandler
 	dialer         Dialer
 	wsURL          string
@@ -275,6 +279,7 @@ func (c *wecomChannel) Connect(ctx context.Context) (err error) {
 			log.Warn("wecom: bad frame envelope", "error", err, "size", len(payload))
 			continue
 		}
+		traceIn(log, env)
 		switch env.Cmd {
 		case cmdMsgCallback, cmdEventCallback:
 			select {
@@ -347,6 +352,10 @@ func (c *wecomChannel) subscribe(ctx context.Context, conn wsConn, sender *wsSen
 		if err := json.Unmarshal(payload, &env); err != nil {
 			continue
 		}
+		// Traced before the req_id filter: a subscribe that is rejected, or
+		// answered on a req_id we never sent, is exactly the failure an
+		// operator turns tracing on to see.
+		traceIn(log, env)
 		if env.Headers.ReqID != reqID {
 			continue
 		}
@@ -368,7 +377,8 @@ func (c *wecomChannel) dispatchFrame(ctx context.Context, env frameEnvelope, sen
 			log.Warn("wecom: bad aibot_msg_callback body", "error", err)
 			return nil
 		}
-		msg := channelMessageFromCallback(c.botID, mc, env.Headers.ReqID)
+		traceInbound(log, mc, mc.Text.Content)
+		msg := channelMessageFromCallback(c.botID, c.botDisplayName, mc, env.Headers.ReqID)
 		if mc.MsgType != "text" {
 			// Iteration 1 routes only text. Rather than drop other types
 			// (voice / image / file) silently — which reads as a broken bot —
@@ -552,6 +562,7 @@ func newWecomFactory(deps ChannelDeps) channel.Factory {
 			installationID: cfg.ID,
 			botID:          creds.BotID,
 			secret:         creds.Secret,
+			botDisplayName: ic.BotDisplayName,
 			handler:        cfg.Handler,
 			dialer:         deps.Dialer,
 			wsURL:          deps.WSURL,
