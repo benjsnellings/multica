@@ -924,13 +924,13 @@ func TestSessionContinuityNoticeMatchesSurface(t *testing.T) {
 	}
 
 	// The notice only renders when the resume actually failed.
-	if blocks := perTurnContextBlocks(Task{IssueID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}); strings.Contains(blocks, "Session Continuity Notice") {
+	if blocks := perTurnContextBlocks(Task{IssueID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}, promptOpts{}); strings.Contains(blocks, "Session Continuity Notice") {
 		t.Errorf("continuity notice leaked into a run that resumed fine:\n%s", blocks)
 	}
 	lost := perTurnContextBlocks(Task{
 		IssueID:                       "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		PriorSessionResumeUnavailable: true,
-	})
+	}, promptOpts{})
 	if !strings.Contains(lost, "Session Continuity Notice") {
 		t.Errorf("continuity notice missing when the resume was unavailable:\n%s", lost)
 	}
@@ -2019,10 +2019,27 @@ func TestGateResumeToReusedWorkdir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			task := Task{PriorSessionID: tt.sessionID, PriorWorkDir: tt.priorDir}
+			// gateResumeToReusedWorkdir compares directory IDENTITY, not path
+			// spelling, so the table's paths have to exist on disk. Mapping
+			// them under one temp root preserves each case's same/different
+			// relationship while making them real.
+			base := t.TempDir()
+			realize := func(p string) string {
+				if p == "" {
+					return ""
+				}
+				real := filepath.Join(base, filepath.FromSlash(strings.TrimPrefix(p, "/")))
+				if err := os.MkdirAll(real, 0o755); err != nil {
+					t.Fatalf("create %s: %v", real, err)
+				}
+				return real
+			}
+			priorDir, envDir := realize(tt.priorDir), realize(tt.envDir)
+
+			task := Task{PriorSessionID: tt.sessionID, PriorWorkDir: priorDir}
 			taskCtx := execenv.TaskContextForEnv{PriorSessionResumed: tt.sessionID != ""}
 
-			reused := gateResumeToReusedWorkdir(&task, &taskCtx, tt.envDir, !tt.sessionHomeUnreachable, slog.Default())
+			reused := gateResumeToReusedWorkdir(&task, &taskCtx, envDir, !tt.sessionHomeUnreachable, slog.Default())
 
 			if reused != tt.wantReused {
 				t.Fatalf("reused = %v, want %v", reused, tt.wantReused)
@@ -5186,9 +5203,9 @@ func TestHermesLaunchArgsAndEnvByScenario(t *testing.T) {
 	customArgs := []string{"-p", "research", "--yolo"}
 	customEnv := map[string]string{"HERMES_HOME": "/home/u/.hermes"}
 
-	// No overlay (skill-less): profile flag passes through, and the user's
-	// HERMES_HOME passes through — behavior unchanged.
-	noOverlayArgs := hermesLaunchArgs(customArgs, false)
+	// No overlay (skill-less): runTask never strips, so the profile flag passes
+	// through, and the user's HERMES_HOME passes through — behavior unchanged.
+	noOverlayArgs := customArgs
 	if len(noOverlayArgs) != 3 || noOverlayArgs[0] != "-p" || noOverlayArgs[1] != "research" {
 		t.Errorf("skill-less task must keep its profile flags, got %v", noOverlayArgs)
 	}
@@ -5199,7 +5216,7 @@ func TestHermesLaunchArgsAndEnvByScenario(t *testing.T) {
 	}
 
 	// Overlay active: profile flag is stripped, and HERMES_HOME is the overlay.
-	overlayArgs := hermesLaunchArgs(customArgs, true)
+	_, overlayArgs := agent.StripHermesProfileSelectors(nil, customArgs, slog.Default())
 	if len(overlayArgs) != 1 || overlayArgs[0] != "--yolo" {
 		t.Errorf("overlay task must strip profile flags, got %v", overlayArgs)
 	}
@@ -5561,5 +5578,44 @@ func TestBuildPromptSquadLeaderMultiThreadCarvesOutNoAction(t *testing.T) {
 	}
 	if strings.Contains(ordinary, "Unless your outcome is") || strings.Contains(ordinary, "skip this ENTIRE fan-out block") {
 		t.Fatalf("ordinary multi-thread prompt leaked the leader carve-out\n---\n%s", ordinary)
+	}
+}
+
+// TestHermesProfileChainCoversLaunchPrefix is the daemon half of GH #7046's
+// Hermes regression. A custom runtime profile's fixed_args are no longer folded
+// into custom_args — they become the launch prefix and reach hermes ahead of
+// custom_args, with the backend's own `acp` token between the two.
+//
+// Both halves of the profile chain therefore have to run against the argv the
+// backend really assembles. Resolving or stripping against a hand-built
+// approximation reads a different profile than the process does, and the
+// overlay gets seeded from the wrong home.
+func TestHermesProfileChainCoversLaunchPrefix(t *testing.T) {
+	t.Parallel()
+
+	// A prefix ending in a value-taking flag: the `acp` token decides which
+	// selection hermes sees, so it must be present when the daemon resolves.
+	launchPrefix := []string{"--model"}
+	customArgs := []string{"-p", "research", "--yolo"}
+
+	sel := agent.ParseHermesProfileArgs(
+		agent.HermesLaunchArgv(launchPrefix, customArgs, slog.Default()))
+	if !sel.Found || sel.Name != "research" {
+		t.Fatalf("effective profile = %+v, want the `research` hermes actually selects", sel)
+	}
+
+	// Overlay active: both regions are stripped together, and the launched argv
+	// can no longer redirect HERMES_HOME out of the overlay.
+	strippedPrefix, strippedCustom := agent.StripHermesProfileSelectors(
+		launchPrefix, customArgs, slog.Default())
+	if sel := agent.ParseHermesProfileArgs(
+		agent.HermesLaunchArgv(strippedPrefix, strippedCustom, slog.Default())); sel.Found {
+		t.Fatalf("the launched argv can still redirect HERMES_HOME: %+v", sel)
+	}
+	if strings.Join(strippedPrefix, "\x00") != "--model" {
+		t.Errorf("prefix = %v, want the non-selector token kept", strippedPrefix)
+	}
+	if strings.Join(strippedCustom, "\x00") != "--yolo" {
+		t.Errorf("custom = %v, want only the selector removed", strippedCustom)
 	}
 }
